@@ -1,0 +1,33 @@
+
+FROM ubuntu:19.04 as base
+
+RUN apt-get update && apt-get install --yes curl
+
+# Download Tini.
+RUN curl --silent --fail --location --output /usr/bin/tini https://github.com/krallin/tini/releases/download/v<%= tiniVersion %>/tini && chmod +x /usr/bin/tini
+
+# Download and install Node.
+RUN curl --silent --fail https://nodejs.org/dist/v<%= nodeVersion %>/node-v<%= nodeVersion %>-linux-x64.tar.gz | tar --gunzip --extract --strip-components=1 --directory=/usr/local
+
+# Create / move to Sentinelle install path.
+WORKDIR /home/node
+
+# Copy manifests and build artifacts into image.
+COPY package /home/node
+
+<% if (hasNpmrc) { %>
+COPY .npmrc .npmrc
+<% } %>
+
+# Install production dependencies.
+RUN npm <%= hasLockfile ? 'ci' : 'install' %> --production --skip-optional --ignore-scripts
+
+<% if (hasNpmrc) { %>
+RUN rm .npmrc
+<% } %>
+
+<% envVars.forEach(envExpression => { %>
+  ENV <%= envExpression %>
+<% }); %>
+
+ENTRYPOINT ["tini", "--", "node", "<%= entry %>"]
