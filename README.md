@@ -43,10 +43,10 @@ Let's imagine we are developing a web server that we want to Dockerize. We're us
 
 To Dockerize this project, we can run `npm run dockerize`, which will invoke the Dockerize CLI via the above package script.
 
-This will produce a Docker image with the tag `web-server-demo` using the current LTS version of Node. To start our containerized web server, we can run:
+This will produce a Docker image with the tag `web-server-demo:0.1.0` using the current LTS version of Node. To start our containerized web server, we can run:
 
 ```
-docker run -it web-server-demo
+docker run -it web-server-demo:0.1.0
 ```
 
 For a full list of CLI options, see `dockerize --help`.
