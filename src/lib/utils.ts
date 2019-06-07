@@ -6,7 +6,7 @@ import ejs from 'ejs';
 import execa from 'execa';
 import findUp from 'find-up';
 import fs from 'fs-extra';
-import {Package} from 'read-pkg-up';
+import {NormalizedPackageJson} from 'read-pkg-up';
 import tar from 'tar';
 
 
@@ -42,7 +42,7 @@ export function parseLabels(labels: any) {
  * Provided a normalized package.json object, returns its first "bin" entry or,
  * if the package does not declare a "bin", its "main" entry.
  */
-export function computePackageEntry(pkg: Package) {
+export function computePackageEntry(pkg: NormalizedPackageJson) {
   if (pkg.bin) {
     return Object.values(pkg.bin)[0];
   }

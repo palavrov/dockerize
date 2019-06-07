@@ -36,20 +36,24 @@ export default async function dockerize(options: DockerizeOptions) {
   const stagingDir = tempy.directory();
 
   // Get the path to the package's package.json and create the staging area.
-  const [{path: pkgJsonPath, pkg}] = await Promise.all([readPkgUp(), fs.ensureDir(stagingDir)]);
+  const [pkg] = await Promise.all([readPkgUp(), fs.ensureDir(stagingDir)]);
+
+  if (!pkg) {
+    throw new Error('Unable to locate a package.json for the local project.');
+  }
 
   // Compute package root.
-  const pkgRoot = path.dirname(pkgJsonPath);
+  const pkgRoot = path.dirname(pkg.path);
 
   // Compute path to the package's entrypoint ("bin" or "main").
-  const entry = computePackageEntry(pkg);
+  const entry = computePackageEntry(pkg.package);
 
   /**
    * Tag that will be applied to the image.
    *
    * Default: <package name>
    */
-  const tag = options.tag || `${pkg.name.replace(/@/g, '')}:${pkg.version}`;
+  const tag = options.tag || `${pkg.package.name.replace(/@/g, '')}:${pkg.package.version}`;
 
   /**
    * Additional labels to apply to the image.
@@ -93,7 +97,7 @@ export default async function dockerize(options: DockerizeOptions) {
   ]);
 
   log.verbose('stagingDir', stagingDir);
-  log.info('package', log.chalk.bold(pkg.name));
+  log.info('package', log.chalk.bold(pkg.package.name));
   log.verbose('root', pkgRoot);
   log.info('entry', entry);
   log.info('nodeVersion', nodeVersion);
