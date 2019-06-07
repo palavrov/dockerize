@@ -132,7 +132,7 @@ export default async function dockerize(options: DockerizeOptions) {
     }
 
     return renderTemplate({
-      template: path.join(__dirname, '..', 'etc', 'dockerfile.ejs'),
+      template: path.join(__dirname, '..', 'etc', 'Dockerfile.ejs'),
       dest: path.join(stagingDir, 'Dockerfile'),
       data: {
         entry,
