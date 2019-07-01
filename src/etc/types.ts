@@ -1,7 +1,9 @@
+import {Arguments} from 'yargs';
+
 /**
  * Options object accepted by Dockerize.
  */
-export interface DockerizeOptions {
+export interface DockerizeArguments extends Arguments {
   /**
    * Tag that will be applied to the image.
    *

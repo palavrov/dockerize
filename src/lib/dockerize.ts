@@ -7,7 +7,7 @@ import readPkgUp from 'read-pkg-up';
 import tempy from 'tempy';
 
 import {DEFAULT_TINI_VERSION} from 'etc/constants';
-import {DockerizeOptions} from 'etc/types';
+import {DockerizeArguments} from 'etc/types';
 import log from 'lib/log';
 
 import {
@@ -23,7 +23,7 @@ import {
 } from 'lib/utils';
 
 
-export default async function dockerize(options: DockerizeOptions) {
+export default async function dockerize(options: DockerizeArguments) {
   ow(options.tag, 'tag', ow.any(ow.undefined, ow.string));
   ow(options.nodeVersion, 'Node version', ow.any(ow.undefined, ow.string));
   ow(options.labels, 'labels', ow.any(ow.undefined, ow.string, ow.array.ofType(ow.string)));
@@ -155,18 +155,18 @@ export default async function dockerize(options: DockerizeOptions) {
   const dockerBuildArgs = [
     '--rm',
     `--tag=${tag}`,
-    `--label NODE_VERSION=${nodeVersion}`,
-    `--label TINI_VERSION=${DEFAULT_TINI_VERSION}`,
+    `--label=NODE_VERSION=${nodeVersion}`,
+    `--label=TINI_VERSION=${DEFAULT_TINI_VERSION}`,
     labels,
     extraArgs
-  ].filter(x => x).join(' ');
+  ].filter(Boolean) as Array<string>;
 
-  log.silly('dockerCmd', `docker build . ${dockerBuildArgs}`);
+  log.silly('dockerCmd', `docker build . ${dockerBuildArgs.join(' ')}`);
 
   log.info('', 'Building image...');
 
   // Build image.
-  await execa.shell(`docker build . ${dockerBuildArgs}`, {
+  await execa('docker', ['build', '.', ...dockerBuildArgs], {
     cwd: stagingDir,
     stdin: 'ignore',
     stdout: ['verbose', 'silly'].includes(log.level) ? 'inherit' : 'ignore',

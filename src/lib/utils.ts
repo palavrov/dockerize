@@ -33,7 +33,7 @@ export function ensureArray<T>(value: T): Array<T> {
  */
 export function parseLabels(labels: any) {
   return ensureArray(labels).map(labelExpression => {
-    return `--label ${labelExpression}`;
+    return `--label=${labelExpression}`;
   }).join(' ');
 }
 
@@ -130,7 +130,7 @@ export async function copyNpmrc(npmrcOption: string | undefined, destDir: string
  * Provided an image name, returns its size.
  */
 export async function getImageSize(imageName: string) {
-  const results = await execa.shell(`docker inspect ${imageName}`);
+  const results = await execa('docker', ['inspect', imageName]);
   return bytes(JSON.parse(results.stdout)[0].Size);
 }
 
