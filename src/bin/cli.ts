@@ -8,10 +8,16 @@ import log from 'lib/log';
 
 
 yargs.command({
-  command: '*',
+  command: '* [cwd]',
   describe: '',
   builder: command => {
     command.usage('Easily Dockerize a NodeJS project.');
+
+    command.positional('cwd', {
+      description: 'Directory of the project to Dockerize.',
+      type: 'string',
+      required: false
+    });
 
     command.option('tag', {
       group: 'Optional Arguments:',
@@ -80,6 +86,9 @@ yargs.command({
       // @ts-ignore
       args.labels = args.label;
       Reflect.deleteProperty(args, 'label');
+
+      // Set cwd to the current directory if it was not set by the user.
+      args.cwd = args.cwd || process.cwd();
 
       await dockerize(args);
     } catch (err) {

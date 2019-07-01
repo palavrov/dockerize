@@ -24,6 +24,7 @@ import {
 
 
 export default async function dockerize(options: DockerizeArguments) {
+  ow(options.cwd, 'cwd', ow.string);
   ow(options.tag, 'tag', ow.any(ow.undefined, ow.string));
   ow(options.nodeVersion, 'Node version', ow.any(ow.undefined, ow.string));
   ow(options.labels, 'labels', ow.any(ow.undefined, ow.string, ow.array.ofType(ow.string)));
@@ -36,7 +37,7 @@ export default async function dockerize(options: DockerizeArguments) {
   const stagingDir = tempy.directory();
 
   // Get the path to the package's package.json and create the staging area.
-  const [pkg] = await Promise.all([readPkgUp(), fs.ensureDir(stagingDir)]);
+  const [pkg] = await Promise.all([readPkgUp({cwd: options.cwd}), fs.ensureDir(stagingDir)]);
 
   if (!pkg) {
     throw new Error('Unable to locate a package.json for the local project.');

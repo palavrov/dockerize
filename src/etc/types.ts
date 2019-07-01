@@ -5,6 +5,13 @@ import {Arguments} from 'yargs';
  */
 export interface DockerizeArguments extends Arguments {
   /**
+   * Root directory of the project to Dockerize.
+   *
+   * Default: process.cwd() (CLI), `undefined` (API)
+   */
+  cwd: string;
+
+  /**
    * Tag that will be applied to the image.
    *
    * Default: <package name>

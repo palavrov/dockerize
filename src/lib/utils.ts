@@ -82,13 +82,15 @@ export async function packAndExtractPackage(pkgRoot: string, destDir: string) {
   // included when publishing the package.
   const tarballName = (await execa('npm', ['pack', '--ignore-scripts'], {cwd: pkgRoot})).stdout;
 
+  const tarballPath = path.resolve(pkgRoot, tarballName);
+
   // Extract the NPM tarball to the staging area. By default, this will create a
   // subdirectory there named 'package' containing the tarball contents.
-  await tar.extract({file: tarballName, cwd: destDir});
+  await tar.extract({file: tarballPath, cwd: destDir});
 
   // Delete the tarball now that we have copied relevant files to the staging
   // area.
-  await fs.remove(tarballName);
+  await fs.remove(tarballPath);
 }
 
 
