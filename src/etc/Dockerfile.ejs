@@ -9,12 +9,16 @@ RUN curl --silent --fail --location --output /usr/bin/tini https://github.com/kr
 # Download and install Node.
 RUN curl --silent --fail https://nodejs.org/dist/v<%= nodeVersion %>/node-v<%= nodeVersion %>-linux-x64.tar.gz | tar --gunzip --extract --strip-components=1 --directory=/usr/local
 
-# Create / move to Sentinelle install path.
+# Uninstall curl & clean up.
+RUN apt-get remove --yes curl && apt-get autoremove --yes && apt-get autoclean
+
+# Create/move to the temporary project path.
 WORKDIR /home/node
 
 # Copy manifests and build artifacts into image.
 COPY package /home/node
 
+# Conditionally copy .npmrc, if specified.
 <% if (hasNpmrc) { %>
 COPY .npmrc .npmrc
 <% } %>
@@ -22,12 +26,15 @@ COPY .npmrc .npmrc
 # Install production dependencies.
 RUN npm <%= hasLockfile ? 'ci' : 'install' %> --production --skip-optional --ignore-scripts
 
+# Conditionally remove .npmrc if it was added earlier.
 <% if (hasNpmrc) { %>
 RUN rm .npmrc
 <% } %>
 
+# Set environment variables.
 <% envVars.forEach(envExpression => { %>
   ENV <%= envExpression %>
 <% }); %>
 
+# Set entrypoint.
 ENTRYPOINT ["tini", "--", "node", "<%= entry %>"]

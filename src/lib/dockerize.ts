@@ -3,7 +3,6 @@ import path from 'path';
 import execa from 'execa';
 import fs from 'fs-extra';
 import ow from 'ow';
-import readPkgUp from 'read-pkg-up';
 import tempy from 'tempy';
 
 import {DEFAULT_TINI_VERSION} from 'etc/constants';
@@ -19,11 +18,14 @@ import {
   getNodeLtsVersion,
   packAndExtractPackage,
   parseLabels,
+  pkgInfo,
   renderTemplate
 } from 'lib/utils';
 
 
 export default async function dockerize(options: DockerizeArguments) {
+  // ----- [1] Validate Options ------------------------------------------------
+
   ow(options.cwd, 'cwd', ow.string);
   ow(options.tag, 'tag', ow.any(ow.undefined, ow.string));
   ow(options.nodeVersion, 'Node version', ow.any(ow.undefined, ow.string));
@@ -33,21 +35,25 @@ export default async function dockerize(options: DockerizeArguments) {
   ow(options.dockerfile, 'custom Dockerfile', ow.any(ow.undefined, ow.string));
   ow(options.npmrc, '.npmrc file', ow.any(ow.undefined, ow.string));
 
+
+  // ----- [2] Prepare Staging Area --------------------------------------------
+
   // Get path to a random temporary directory we will use as our staging area.
   const stagingDir = tempy.directory();
+  await fs.ensureDir(stagingDir);
+
+
+  // ----- [3] Introspect Host Package -----------------------------------------
 
   // Get the path to the package's package.json and create the staging area.
-  const [pkg] = await Promise.all([readPkgUp({cwd: options.cwd}), fs.ensureDir(stagingDir)]);
+  const pkg = await pkgInfo({cwd: options.cwd});
 
-  if (!pkg) {
-    throw new Error('Unable to locate a package.json for the local project.');
-  }
-
-  // Compute package root.
-  const pkgRoot = path.dirname(pkg.path);
-
-  // Compute path to the package's entrypoint ("bin" or "main").
+  // Compute path to the package's entrypoint ("bin" or "main"). This will be
+  // used as the ENTRYPOINT in the final image.
   const entry = computePackageEntry(pkg.package);
+
+
+  // ----- [4] Parse Docker Options --------------------------------------------
 
   /**
    * Tag that will be applied to the image.
@@ -64,7 +70,7 @@ export default async function dockerize(options: DockerizeArguments) {
   /**
    * Environment variables to set in the image.
    */
-  const envVars = ensureArray(options.env);
+  const envVars = ensureArray<string>(options.env);
 
   /**
    * Extra arguments to pass to `docker build`.
@@ -75,6 +81,9 @@ export default async function dockerize(options: DockerizeArguments) {
    * Path to a custom Dockerfile to use.
    */
   const customDockerfile = options.dockerfile;
+
+
+  // ----- [5] Compute Node Version, Copy .npmrc, Copy Lockfile ----------------
 
   const [
     /**
@@ -94,38 +103,62 @@ export default async function dockerize(options: DockerizeArguments) {
    ] = await Promise.all([
     options.nodeVersion || getNodeLtsVersion(),
     copyNpmrc(options.npmrc, stagingDir),
-    copyPackageLockfile(pkgRoot, path.join(stagingDir, 'package'))
+    copyPackageLockfile(pkg.root, path.join(stagingDir, 'package'))
   ]);
 
-  log.verbose('stagingDir', stagingDir);
-  log.info('package', log.chalk.bold(pkg.package.name));
-  log.verbose('root', pkgRoot);
-  log.info('entry', entry);
-  log.info('nodeVersion', nodeVersion);
 
-  if (hasLockfile) {
-    log.info('lockfile', 'Using package\'s lockfile.');
-  } else {
-    log.info('lockfile', 'Package does not have a lockfile.');
+  // ----- [6] Build Docker Command --------------------------------------------
+
+  const dockerBuildArgs = [
+    '--rm',
+    `--tag=${tag}`,
+    `--label=NODE_VERSION=${nodeVersion}`,
+    `--label=TINI_VERSION=${DEFAULT_TINI_VERSION}`,
+    labels,
+    extraArgs
+  ].filter(Boolean) as Array<string>;
+
+
+  // ----- [7] Log Build Metadata ----------------------------------------------
+
+  log.info(`Dockerizing package ${log.chalk.green.bold(pkg.package.name)}.`);
+  log.info(`⁃ Entrypoint: ${log.chalk.green(entry)}`);
+  log.info(`⁃ Node Version: ${log.chalk.bold(nodeVersion)}`);
+  log.verbose(`⁃ Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'].bold(String(hasLockfile))}`);
+
+  if (envVars.length) {
+    log.info('⁃ Environment Variables:');
+
+    envVars.forEach(varExpression => {
+      const [key, value] = varExpression.split('=');
+      log.info(`  ⁃ ${key}=${value}`);
+    });
+  }
+
+  if (options.labels) {
+    log.info('⁃ Labels:');
+
+    ensureArray<string>(options.labels).forEach(labelExpression => {
+      const [key, value] = labelExpression.split('=');
+      log.info(`  ⁃ ${key}: ${value}`);
+    });
   }
 
   if (customDockerfile) {
-    log.verbose('dockerfile', customDockerfile);
+    log.info(`⁃ Custom Dockerfile: ${log.chalk.green(customDockerfile)}`);
   }
 
-  envVars.forEach(varExpression => {
-    log.info('env', varExpression);
-  });
-
-  ensureArray(options.labels).forEach(labelExpression => {
-    log.info('label', labelExpression);
-  });
+  log.verbose(`⁃ Package Root: ${log.chalk.green(pkg.root)}`);
+  log.verbose(`⁃ Staging Directory: ${log.chalk.green(stagingDir)}`);
 
   if (extraArgs) {
-    log.info('extraArgs', extraArgs);
+    log.verbose(`⁃ Extra Docker Args: ${extraArgs}`);
   }
 
-  log.info('tag', tag);
+  log.verbose(`⁃ Docker Command: "docker build ${dockerBuildArgs.join(' ')} ."`);
+
+
+  // ----- [8] Pack Package & Render Dockerfile --------------------------------
 
   const renderDockerfile = async () => {
     if (customDockerfile) {
@@ -146,39 +179,44 @@ export default async function dockerize(options: DockerizeArguments) {
     });
   };
 
+  const buildTime = log.createTimer();
+  const spinner = log.createSpinner();
+  const endInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan.bold(tag)}...`));
+
   await Promise.all([
     // Copy production-relevant package files to the staging directory.
-    packAndExtractPackage(pkgRoot, stagingDir),
+    packAndExtractPackage(pkg.root, stagingDir),
     // Write Dockerfile.
     renderDockerfile()
   ]);
 
-  const dockerBuildArgs = [
-    '--rm',
-    `--tag=${tag}`,
-    `--label=NODE_VERSION=${nodeVersion}`,
-    `--label=TINI_VERSION=${DEFAULT_TINI_VERSION}`,
-    labels,
-    extraArgs
-  ].filter(Boolean) as Array<string>;
 
-  log.silly('dockerCmd', `docker build . ${dockerBuildArgs.join(' ')}`);
+  // ----- [9] Build Image -----------------------------------------------------
 
-  log.info('', 'Building image...');
-
-  // Build image.
-  await execa('docker', ['build', '.', ...dockerBuildArgs], {
+  const buildProcess = execa('docker', ['build', '.', ...dockerBuildArgs], {
     cwd: stagingDir,
     stdin: 'ignore',
-    stdout: ['verbose', 'silly'].includes(log.level) ? 'inherit' : 'ignore',
-    stderr: 'inherit'
+    stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
+    stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
   });
 
-  // Get final image size and clean up staging directory.
+  if (buildProcess.stdout) {
+    buildProcess.stdout.pipe(log.createPipe('silly'));
+  }
+
+  if (buildProcess.stderr) {
+    buildProcess.stderr.pipe(log.createPipe('silly'));
+  }
+
+  await buildProcess;
+
+
+  // ----- [10] Compute Image Size & Clean Up ----------------------------------
+
   const [imageSize] = await Promise.all([
     getImageSize(tag),
     fs.remove(stagingDir)
   ]);
 
-  log.info('', `Built image ${log.chalk.cyan.bold(tag)} (${imageSize})`);
+  endInteractive(() => log.info(`🏁 Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
 }

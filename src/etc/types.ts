@@ -1,5 +1,6 @@
 import {Arguments} from 'yargs';
 
+
 /**
  * Options object accepted by Dockerize.
  */

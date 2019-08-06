@@ -33,7 +33,7 @@
     "prepare": "nps prepare"
   },
   "dependencies": {
-    "@darkobits/log": "^1.2.3",
+    "@darkobits/log": "^2.0.0-beta.7",
     "@darkobits/node-versions": "^1.0.1",
     "bytes": "^3.1.0",
     "ejs": "^2.6.2",

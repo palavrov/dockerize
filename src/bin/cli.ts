@@ -26,7 +26,7 @@ yargs.command({
       type: 'string'
     });
 
-    command.option('nodeVersion', {
+    command.option('node-version', {
       group: 'Optional Arguments:',
       description: 'Node version to install in the image. [Default: LTS]',
       required: false,
@@ -49,7 +49,7 @@ yargs.command({
       conflicts: ['dockerfile']
     });
 
-    command.option('extraArgs', {
+    command.option('extra-args', {
       group: 'Optional Arguments:',
       description: 'Optional extra arguments to pass to "docker build"; should be wrapped in quotes.',
       required: false,
@@ -73,6 +73,7 @@ yargs.command({
     });
 
     command.example('$0', 'Dockerize the NodeJS project in the current directory using default options.');
+    command.example('$0 --label="foo=bar" --label="baz=qux" --extra-args="--squash"', 'Dockerize the NodeJS project in the current directory, apply two labels, and pass the --squash argument to Docker.');
 
     return command;
   },
@@ -80,7 +81,9 @@ yargs.command({
     try {
       // Log level is 'silent' by default for Node API use cases; set it to
       // LOG_LEVEL or 'info' by default for CLI use.
-      log.level = process.env.LOG_LEVEL || 'info';
+      log.configure({
+        level: process.env.LOG_LEVEL || 'info'
+      });
 
       // Pluralize 'label' when passing options to dockerize.
       // @ts-ignore

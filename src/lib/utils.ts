@@ -6,7 +6,7 @@ import ejs from 'ejs';
 import execa from 'execa';
 import findUp from 'find-up';
 import fs from 'fs-extra';
-import {NormalizedPackageJson} from 'read-pkg-up';
+import readPkgUp, {NormalizedPackageJson, Options} from 'read-pkg-up';
 import tar from 'tar';
 
 
@@ -14,8 +14,8 @@ import tar from 'tar';
  * If the provided value is an array, it is returned as-is. Otherwise, the value
  * is wrapped in an array and returned.
  */
-export function ensureArray<T>(value: T): Array<T> {
-  if (!value) {
+export function ensureArray<T = any>(value: any): Array<T> {
+  if (value === undefined) {
     return [];
   }
 
@@ -37,6 +37,54 @@ export function parseLabels(labels: any) {
   }).join(' ');
 }
 
+
+/**
+ * Object returned by `pkgInfo`.
+ */
+export interface PkgInfoResult {
+  /**
+   * Object containing the parsed/normalized contents of the package's
+   * package.json.
+   */
+  package: NormalizedPackageJson;
+
+  /**
+   * Root directory of the package.
+   *
+   * Note: This is _not_ the path to its package.json.
+   */
+  root: string;
+}
+
+
+/**
+ * Wraps `readPkgUp` and automatically throws if a package.json file could not
+ * be found.
+ */
+export async function pkgInfo(opts?: Options): Promise<PkgInfoResult> {
+  const pkg = await readPkgUp({
+    ...opts,
+    // Even though this is `true` by default, we need it here because the
+    // typings for read-pkg-up are wonky and without it, we wont get the right
+    // type for our results.
+    normalize: true
+  });
+
+  if (!pkg) {
+    if (opts && opts.cwd) {
+      throw new Error(`Unable to find a "package.json" for the package at ${opts.cwd}.`);
+    }
+
+    throw new Error('Unable to find a "package.json".');
+  }
+
+  const root = path.dirname(pkg.path);
+
+  return {
+    package: pkg.package,
+    root
+  };
+}
 
 /**
  * Provided a normalized package.json object, returns its first "bin" entry or,
