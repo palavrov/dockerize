@@ -55,6 +55,14 @@ For a full list of CLI options, see `dockerize --help`.
 
 Dockerize can also be used programatically. This package's default export is a function that accepts a single options object. For a complete list of options, see [`types.ts`](/src/etc/types.ts).
 
+## Images
+
+Images produced using Dockerize's default Dockerfile have the following attributes:
+
+* Based on the [Ubuntu 19.04 image](https://hub.docker.com/_/ubuntu), which is "minimal" by default, and therefore relatively small.
+* Dockerize will install the [current LTS version of Node](https://github.com/darkobits/node-versions) at build time.
+* [Tini](https://github.com/krallin/tini) is used as a minimalistic process manager to ensure proper POSIX signal handling.
+
 ## &nbsp;
 <p align="center">
   <br>
