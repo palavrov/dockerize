@@ -57,4 +57,11 @@ export interface DockerizeArguments extends Arguments {
    * This file will be removed from the final image.
    */
   npmrc?: string;
+
+  /**
+   * Whether to run 'docker push' after building an image.
+   *
+   * Note: This option assumes 'docker login' has already been run.
+   */
+  push?: boolean;
 }

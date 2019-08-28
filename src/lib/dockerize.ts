@@ -34,6 +34,7 @@ export default async function dockerize(options: DockerizeArguments) {
   ow(options.extraArgs, 'extra Docker arguments', ow.any(ow.undefined, ow.string));
   ow(options.dockerfile, 'custom Dockerfile', ow.any(ow.undefined, ow.string));
   ow(options.npmrc, '.npmrc file', ow.any(ow.undefined, ow.string));
+  ow(options.push, 'push', ow.any(ow.undefined, ow.boolean));
 
 
   // ----- [2] Prepare Staging Area --------------------------------------------
@@ -181,7 +182,7 @@ export default async function dockerize(options: DockerizeArguments) {
 
   const buildTime = log.createTimer();
   const spinner = log.createSpinner();
-  const endInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan.bold(tag)}...`));
+  const endBuildInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan.bold(tag)}...`));
 
   await Promise.all([
     // Copy production-relevant package files to the staging directory.
@@ -218,5 +219,33 @@ export default async function dockerize(options: DockerizeArguments) {
     fs.remove(stagingDir)
   ]);
 
-  endInteractive(() => log.info(`🏁 Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
+  endBuildInteractive(() => log.info(`🏁 Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
+
+
+  // ----- [11] (Optional) Push Image ------------------------------------------
+
+  if (!options.push) {
+    return;
+  }
+
+  const pushTime = log.createTimer();
+  const endPushInteractive = log.beginInteractive(() => log.info(`${spinner} Pushing image ${log.chalk.cyan.bold(tag)}...`));
+
+  const pushProcess = execa('docker', ['push', tag], {
+    stdin: 'ignore',
+    stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
+    stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
+  });
+
+  if (pushProcess.stdout) {
+    pushProcess.stdout.pipe(log.createPipe('silly'));
+  }
+
+  if (pushProcess.stderr) {
+    pushProcess.stderr.pipe(log.createPipe('silly'));
+  }
+
+  await pushProcess;
+
+  endPushInteractive(() => log.info(`🚀 Pushed image ${log.chalk.cyan.bold(tag)} in ${pushTime}.`));
 }

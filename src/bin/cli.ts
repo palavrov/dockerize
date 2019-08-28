@@ -72,6 +72,14 @@ yargs.command({
       conflicts: ['dockerfile']
     });
 
+    command.option('push', {
+      group: 'Optional Arguments:',
+      description: 'Whether to push images to a registry.',
+      required: false,
+      type: 'boolean',
+      default: false
+    });
+
     command.example('$0', 'Dockerize the NodeJS project in the current directory using default options.');
     command.example('$0 --label="foo=bar" --label="baz=qux" --extra-args="--squash"', 'Dockerize the NodeJS project in the current directory, apply two labels, and pass the --squash argument to Docker.');
 
