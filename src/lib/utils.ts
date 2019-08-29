@@ -11,6 +11,27 @@ import tar from 'tar';
 
 
 /**
+ * Ensures that Docker is installed on the system and that the Docker daemon is
+ * running.
+ */
+export async function ensureDocker() {
+  try {
+    await execa('docker', ['version']);
+  } catch (err) {
+    if (err.exitCode === 127 || (err.exitCode === 2 && err.exitCodeName === 'ENOENT')) {
+      throw new Error('The "docker" command could not be found. Ensure Docker is installed.');
+    }
+
+    if (err.stderr.toLowerCase().includes('cannot connect to the docker daemon')) {
+      throw new Error('Unable to connect to the Docker daemon. Ensure Docker is running.');
+    }
+
+    throw err;
+  }
+}
+
+
+/**
  * If the provided value is an array, it is returned as-is. Otherwise, the value
  * is wrapped in an array and returned.
  */
@@ -177,7 +198,7 @@ export async function copyNpmrc(npmrcOption: string | undefined, destDir: string
 
 
 /**
- * Provided an image name, returns its size.
+ * Provided a Docker image name, returns its size.
  */
 export async function getImageSize(imageName: string) {
   const results = await execa('docker', ['inspect', imageName]);

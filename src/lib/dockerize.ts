@@ -24,6 +24,9 @@ import {
 
 
 export default async function dockerize(options: DockerizeArguments) {
+  await ensureDocker();
+
+
   // ----- [1] Validate Options ------------------------------------------------
 
   ow(options.cwd, 'cwd', ow.string);
