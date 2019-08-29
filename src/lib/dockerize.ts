@@ -2,6 +2,7 @@ import path from 'path';
 
 import execa from 'execa';
 import fs from 'fs-extra';
+import emoji from 'node-emoji';
 import ow from 'ow';
 import tempy from 'tempy';
 
@@ -14,6 +15,7 @@ import {
   copyPackageLockfile,
   copyNpmrc,
   ensureArray,
+  ensureDocker,
   getImageSize,
   getNodeLtsVersion,
   packAndExtractPackage,
@@ -125,7 +127,7 @@ export default async function dockerize(options: DockerizeArguments) {
 
   // ----- [7] Log Build Metadata ----------------------------------------------
 
-  log.info(`Dockerizing package ${log.chalk.green.bold(pkg.package.name)}.`);
+  log.info(`${emoji.get('whale')}  Dockerizing package ${log.chalk.green.bold(pkg.package.name)}.`);
   log.info(`⁃ Entrypoint: ${log.chalk.green(entry)}`);
   log.info(`⁃ Node Version: ${log.chalk.bold(nodeVersion)}`);
   log.verbose(`⁃ Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'].bold(String(hasLockfile))}`);
@@ -222,7 +224,7 @@ export default async function dockerize(options: DockerizeArguments) {
     fs.remove(stagingDir)
   ]);
 
-  endBuildInteractive(() => log.info(`🏁 Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
+  endBuildInteractive(() => log.info(`${emoji.get('checkered_flag')}  Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
 
 
   // ----- [11] (Optional) Push Image ------------------------------------------
@@ -250,5 +252,5 @@ export default async function dockerize(options: DockerizeArguments) {
 
   await pushProcess;
 
-  endPushInteractive(() => log.info(`🚀 Pushed image ${log.chalk.cyan.bold(tag)} in ${pushTime}.`));
+  endPushInteractive(() => log.info(`${emoji.get('rocket')}  Pushed image ${log.chalk.cyan.bold(tag)} in ${pushTime}.`));
 }
