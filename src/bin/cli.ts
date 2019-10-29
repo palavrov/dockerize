@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import os from 'os';
+
 import yargs from 'yargs';
 
 import {DockerizeArguments} from 'etc/types';
@@ -103,9 +105,19 @@ yargs.command({
 
       await dockerize(args);
     } catch (err) {
-      const [message, ...stack] = err.stack.split('\n');
+      let message: string;
+      let stackLines: Array<string>;
+
+      // N.B. Errors from ow are of type ArgumentError.
+      if (err && err.name === 'ArgumentError') {
+        message = err.message;
+        stackLines = err.stack.split(os.EOL).filter((line: string) => !line.startsWith('- '));
+      } else {
+        [message, ...stackLines] = err.stack.split(os.EOL);
+      }
+
       log.error('', message);
-      log.verbose('', stack.join('\n'));
+      log.verbose('', stackLines.join(os.EOL));
       process.exit(1);
     }
   }

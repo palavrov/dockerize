@@ -108,6 +108,8 @@ export default async function dockerize(options: DockerizeArguments) {
     hasLockfile
    ] = await Promise.all([
     options.nodeVersion || getNodeLtsVersion(),
+    // N.B. These two files are not included in `npm pack`, so we have to copy
+    // them explicitly.
     copyNpmrc(options.npmrc, stagingDir),
     copyPackageLockfile(pkg.root, path.join(stagingDir, 'package'))
   ]);
@@ -130,7 +132,7 @@ export default async function dockerize(options: DockerizeArguments) {
       finalDockerfileSourcePath = absoluteCustomDockerfilePath;
       await fs.copy(absoluteCustomDockerfilePath, targetDockerfilePath);
     } catch (err) {
-      throw new Error(`Error loading custom Dockerfile: ${err.message}`);
+      throw new Error(`Error reading custom Dockerfile: ${err.message}`);
     }
   }
 
@@ -174,12 +176,12 @@ export default async function dockerize(options: DockerizeArguments) {
     `--label=TINI_VERSION=${DEFAULT_TINI_VERSION}`,
     labels,
     extraArgs
-  ].filter(Boolean) as Array<string>;
+  ].filter(Boolean).join(' ');
 
 
   // ----- [8] Log Build Metadata ----------------------------------------------
 
-  log.info(`${emoji.get('whale')}  Dockerizing package ${log.chalk.green.bold(pkg.package.name)}.`);
+  log.info(`${emoji.get('whale')}  Dockerizing package ${log.chalk.green(pkg.package.name)}.`);
 
   log.verbose(`- Package Root: ${log.chalk.green(pkg.root)}`);
   log.verbose(`- Staging Directory: ${log.chalk.green(stagingDir)}`);
@@ -188,27 +190,27 @@ export default async function dockerize(options: DockerizeArguments) {
     log.verbose(`- Extra Docker Args: ${extraArgs}`);
   }
 
-  log.verbose(`- Docker Command: "docker build ${dockerBuildArgs.join(' ')} ."`);
+  log.verbose(`- Docker Command: "docker build ${options.cwd} ${dockerBuildArgs}"`);
 
   if (finalDockerfileSourcePath) {
     log.info(`- Dockerfile: ${log.chalk.green(finalDockerfileSourcePath)}`);
   }
 
   log.info(`- Entrypoint: ${log.chalk.green(entry)}`);
-  log.info(`- Node Version: ${log.chalk.bold(nodeVersion)}`);
-  log.info(`- Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'].bold(String(hasLockfile))}`);
+  log.info(`- Node Version: ${log.chalk.green(nodeVersion)}`);
+  log.info(`- Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'](String(hasLockfile))}`);
 
   if (envVars.length) {
     log.info('⁃ Environment Variables:');
 
     envVars.forEach(varExpression => {
       const [key, value] = varExpression.split('=');
-      log.info(`  ⁃ ${key}=${value}`);
+      log.info(`  - ${key}=${value}`);
     });
   }
 
   if (options.labels) {
-    log.info('⁃ Labels:');
+    log.info('- Labels:');
 
     ensureArray<string>(options.labels).forEach(labelExpression => {
       const [key, value] = labelExpression.split('=');
@@ -220,7 +222,7 @@ export default async function dockerize(options: DockerizeArguments) {
   // ----- [9] Pack Package ----------------------------------------------------
 
   const spinner = log.createSpinner();
-  const endBuildInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan.bold(tag)}...`));
+  const endBuildInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan(tag)}...`));
 
   // Copy production-relevant package files to the staging directory.
   await packAndExtractPackage(pkg.root, stagingDir);
@@ -228,11 +230,12 @@ export default async function dockerize(options: DockerizeArguments) {
 
   // ----- [10] Build Image -----------------------------------------------------
 
-  const buildProcess = execa('docker', ['build', '.', ...dockerBuildArgs], {
+  const buildProcess = execa.command(`docker build . ${dockerBuildArgs}`, {
     cwd: stagingDir,
     stdin: 'ignore',
     stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
     stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
+    buffer: log.isLevelAtLeast('silly') ? false : true,
   });
 
   if (buildProcess.stdout) {
@@ -240,7 +243,7 @@ export default async function dockerize(options: DockerizeArguments) {
   }
 
   if (buildProcess.stderr) {
-    buildProcess.stderr.pipe(log.createPipe('silly'));
+    buildProcess.stderr.pipe(log.createPipe('error'));
   }
 
   await buildProcess;
@@ -253,7 +256,14 @@ export default async function dockerize(options: DockerizeArguments) {
     fs.remove(stagingDir)
   ]);
 
-  endBuildInteractive(() => log.info(`${emoji.get('checkered_flag')}  Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
+  const doneMessage = `${emoji.get('checkered_flag')}  Built image ${log.chalk.cyan(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`;
+
+  if (log.isLevelAtLeast('silly')) {
+    endBuildInteractive(() => log.info(''));
+    log.info(doneMessage);
+  } else {
+    endBuildInteractive(() => log.info(doneMessage));
+  }
 
 
   // ----- [12] (Optional) Push Image ------------------------------------------
@@ -263,7 +273,7 @@ export default async function dockerize(options: DockerizeArguments) {
   }
 
   const pushTime = log.createTimer();
-  const endPushInteractive = log.beginInteractive(() => log.info(`${spinner} Pushing image ${log.chalk.cyan.bold(tag)}...`));
+  const endPushInteractive = log.beginInteractive(() => log.info(`${spinner} Pushing image ${log.chalk.cyan(tag)}...`));
 
   const pushProcess = execa('docker', ['push', tag], {
     stdin: 'ignore',
@@ -281,5 +291,5 @@ export default async function dockerize(options: DockerizeArguments) {
 
   await pushProcess;
 
-  endPushInteractive(() => log.info(`${emoji.get('rocket')}  Pushed image ${log.chalk.cyan.bold(tag)} in ${pushTime}.`));
+  endPushInteractive(() => log.info(`${emoji.get('rocket')}  Pushed image ${log.chalk.cyan(tag)} in ${pushTime}.`));
 }
