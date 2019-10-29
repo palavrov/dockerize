@@ -9,6 +9,8 @@ import fs from 'fs-extra';
 import readPkgUp, {NormalizedPackageJson, Options} from 'read-pkg-up';
 import tar from 'tar';
 
+import {DOCKER_IMAGE_PATTERN} from 'etc/constants';
+
 
 /**
  * Ensures that Docker is installed on the system and that the Docker daemon is
@@ -121,6 +123,34 @@ export function computePackageEntry(pkg: NormalizedPackageJson) {
   }
 
   throw new Error('Project\'s package.json contains no "main" or "bin" fields.');
+}
+
+
+/**
+ * Provided a base image name and a package.json object, computes a final image
+ * name to use and then validates it.
+ */
+export function computeTag(tagFromOptions: string | undefined, packageJson: NormalizedPackageJson) {
+  let result: string;
+
+  const scope = packageJson.name.includes('/') ? packageJson.name.replace(/@/g, '').split('/')[0] : '';
+  const name = packageJson.name.split('/').slice(-1)[0];
+  const version = packageJson.version;
+
+  if (!tagFromOptions) {
+    result = `${scope ? `${scope}/` : ''}${name}:${version}`;
+  } else {
+    result = tagFromOptions;
+    result = result.replace('{{packageName}}', name);
+    result = result.replace('{{packageScope}}', scope);
+    result = result.replace('{{packageVersion}}', version);
+  }
+
+  if (!DOCKER_IMAGE_PATTERN.test(result)) {
+    throw new Error(`Invalid image name: ${result}`);
+  }
+
+  return result;
 }
 
 

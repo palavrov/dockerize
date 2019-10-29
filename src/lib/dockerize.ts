@@ -12,6 +12,7 @@ import log from 'lib/log';
 
 import {
   computePackageEntry,
+  computeTag,
   copyPackageLockfile,
   copyNpmrc,
   ensureArray,
@@ -66,7 +67,7 @@ export default async function dockerize(options: DockerizeArguments) {
    *
    * Default: <package name>
    */
-  const tag = options.tag || `${pkg.package.name.replace(/@/g, '')}:${pkg.package.version}`;
+  const tag = computeTag(options.tag, pkg.package);
 
   /**
    * Additional labels to apply to the image.
