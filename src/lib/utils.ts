@@ -109,6 +109,7 @@ export async function pkgInfo(opts?: Options): Promise<PkgInfoResult> {
   };
 }
 
+
 /**
  * Provided a normalized package.json object, returns its first "bin" entry or,
  * if the package does not declare a "bin", its "main" entry.

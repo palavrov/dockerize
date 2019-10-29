@@ -51,7 +51,7 @@ yargs.command({
 
     command.option('extra-args', {
       group: 'Optional Arguments:',
-      description: 'Optional extra arguments to pass to "docker build"; should be wrapped in quotes.',
+      description: 'Optional extra arguments to pass to "docker build". This is treated as a single string and should be quoted.',
       required: false,
       type: 'string'
     });

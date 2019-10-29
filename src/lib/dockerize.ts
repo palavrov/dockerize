@@ -27,6 +27,7 @@ import {
 
 
 export default async function dockerize(options: DockerizeArguments) {
+  const buildTime = log.createTimer();
   await ensureDocker();
 
 
@@ -43,14 +44,7 @@ export default async function dockerize(options: DockerizeArguments) {
   ow(options.push, 'push', ow.any(ow.undefined, ow.boolean));
 
 
-  // ----- [2] Prepare Staging Area --------------------------------------------
-
-  // Get path to a random temporary directory we will use as our staging area.
-  const stagingDir = tempy.directory();
-  await fs.ensureDir(stagingDir);
-
-
-  // ----- [3] Introspect Host Package -----------------------------------------
+  // ----- [2] Introspect Host Package -----------------------------------------
 
   // Get the path to the package's package.json and create the staging area.
   const pkg = await pkgInfo({cwd: options.cwd});
@@ -60,12 +54,10 @@ export default async function dockerize(options: DockerizeArguments) {
   const entry = computePackageEntry(pkg.package);
 
 
-  // ----- [4] Parse Docker Options --------------------------------------------
+  // ----- [3] Parse Options ---------------------------------------------------
 
   /**
    * Tag that will be applied to the image.
-   *
-   * Default: <package name>
    */
   const tag = computeTag(options.tag, pkg.package);
 
@@ -88,6 +80,13 @@ export default async function dockerize(options: DockerizeArguments) {
    * Path to a custom Dockerfile to use.
    */
   const customDockerfile = options.dockerfile;
+
+
+  // ----- [4] Prepare Staging Area --------------------------------------------
+
+  // Get path to a random temporary directory we will use as our staging area.
+  const stagingDir = tempy.directory();
+  await fs.ensureDir(stagingDir);
 
 
   // ----- [5] Compute Node Version, Copy .npmrc, Copy Lockfile ----------------
@@ -113,8 +112,60 @@ export default async function dockerize(options: DockerizeArguments) {
     copyPackageLockfile(pkg.root, path.join(stagingDir, 'package'))
   ]);
 
+  // ----- [6] Determine Dockerfile Strategy -----------------------------------
 
-  // ----- [6] Build Docker Command --------------------------------------------
+  // Path where we want the final Dockerfile to be.
+  const targetDockerfilePath = path.join(stagingDir, 'Dockerfile');
+
+  // Path indicating where we found a Dockerfile, or undefined if using a
+  // generated one.
+  let finalDockerfileSourcePath: string | undefined;
+
+  // [6a] If a `--dockerfile` argument was provided, use the Dockerfile at that
+  // path.
+  if (customDockerfile) {
+    try {
+      const absoluteCustomDockerfilePath = path.resolve(customDockerfile);
+      await fs.access(absoluteCustomDockerfilePath);
+      finalDockerfileSourcePath = absoluteCustomDockerfilePath;
+      await fs.copy(absoluteCustomDockerfilePath, targetDockerfilePath);
+    } catch (err) {
+      throw new Error(`Error loading custom Dockerfile: ${err.message}`);
+    }
+  }
+
+  // [6b] Otherwise, if a Dockerfile is present in the build context, use it.
+  if (!finalDockerfileSourcePath) {
+    try {
+      const contextDockerfilePath = path.resolve(options.cwd, 'Dockerfile');
+      await fs.access(contextDockerfilePath);
+      finalDockerfileSourcePath = contextDockerfilePath;
+      return fs.copy(contextDockerfilePath, targetDockerfilePath);
+    } catch (err) {
+      // Context does not have a Dockerfile, we can safely recover from this and
+      // move on to generating our own.
+    }
+  }
+
+  // [6c] Otherwise, programmatically generate a Dockerfile and place it in the
+  // build context.
+  if (!finalDockerfileSourcePath) {
+    await renderTemplate({
+      template: path.join(__dirname, '..', 'etc', 'Dockerfile.ejs'),
+      dest: targetDockerfilePath,
+      data: {
+        entry,
+        envVars,
+        hasLockfile,
+        nodeVersion,
+        tiniVersion: DEFAULT_TINI_VERSION,
+        hasNpmrc
+      }
+    });
+  }
+
+
+  // ----- [7] Construct Docker Command ----------------------------------------
 
   const dockerBuildArgs = [
     '--rm',
@@ -126,12 +177,26 @@ export default async function dockerize(options: DockerizeArguments) {
   ].filter(Boolean) as Array<string>;
 
 
-  // ----- [7] Log Build Metadata ----------------------------------------------
+  // ----- [8] Log Build Metadata ----------------------------------------------
 
   log.info(`${emoji.get('whale')}  Dockerizing package ${log.chalk.green.bold(pkg.package.name)}.`);
-  log.info(`⁃ Entrypoint: ${log.chalk.green(entry)}`);
-  log.info(`⁃ Node Version: ${log.chalk.bold(nodeVersion)}`);
-  log.verbose(`⁃ Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'].bold(String(hasLockfile))}`);
+
+  log.verbose(`- Package Root: ${log.chalk.green(pkg.root)}`);
+  log.verbose(`- Staging Directory: ${log.chalk.green(stagingDir)}`);
+
+  if (extraArgs) {
+    log.verbose(`- Extra Docker Args: ${extraArgs}`);
+  }
+
+  log.verbose(`- Docker Command: "docker build ${dockerBuildArgs.join(' ')} ."`);
+
+  if (finalDockerfileSourcePath) {
+    log.info(`- Dockerfile: ${log.chalk.green(finalDockerfileSourcePath)}`);
+  }
+
+  log.info(`- Entrypoint: ${log.chalk.green(entry)}`);
+  log.info(`- Node Version: ${log.chalk.bold(nodeVersion)}`);
+  log.info(`- Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'].bold(String(hasLockfile))}`);
 
   if (envVars.length) {
     log.info('⁃ Environment Variables:');
@@ -151,54 +216,17 @@ export default async function dockerize(options: DockerizeArguments) {
     });
   }
 
-  if (customDockerfile) {
-    log.info(`⁃ Custom Dockerfile: ${log.chalk.green(customDockerfile)}`);
-  }
 
-  log.verbose(`⁃ Package Root: ${log.chalk.green(pkg.root)}`);
-  log.verbose(`⁃ Staging Directory: ${log.chalk.green(stagingDir)}`);
+  // ----- [9] Pack Package ----------------------------------------------------
 
-  if (extraArgs) {
-    log.verbose(`⁃ Extra Docker Args: ${extraArgs}`);
-  }
-
-  log.verbose(`⁃ Docker Command: "docker build ${dockerBuildArgs.join(' ')} ."`);
-
-
-  // ----- [8] Pack Package & Render Dockerfile --------------------------------
-
-  const renderDockerfile = async () => {
-    if (customDockerfile) {
-      return fs.copy(customDockerfile, path.join(stagingDir, 'Dockerfile'));
-    }
-
-    return renderTemplate({
-      template: path.join(__dirname, '..', 'etc', 'Dockerfile.ejs'),
-      dest: path.join(stagingDir, 'Dockerfile'),
-      data: {
-        entry,
-        envVars,
-        hasLockfile,
-        nodeVersion,
-        tiniVersion: DEFAULT_TINI_VERSION,
-        hasNpmrc
-      }
-    });
-  };
-
-  const buildTime = log.createTimer();
   const spinner = log.createSpinner();
   const endBuildInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan.bold(tag)}...`));
 
-  await Promise.all([
-    // Copy production-relevant package files to the staging directory.
-    packAndExtractPackage(pkg.root, stagingDir),
-    // Write Dockerfile.
-    renderDockerfile()
-  ]);
+  // Copy production-relevant package files to the staging directory.
+  await packAndExtractPackage(pkg.root, stagingDir);
 
 
-  // ----- [9] Build Image -----------------------------------------------------
+  // ----- [10] Build Image -----------------------------------------------------
 
   const buildProcess = execa('docker', ['build', '.', ...dockerBuildArgs], {
     cwd: stagingDir,
@@ -218,7 +246,7 @@ export default async function dockerize(options: DockerizeArguments) {
   await buildProcess;
 
 
-  // ----- [10] Compute Image Size & Clean Up ----------------------------------
+  // ----- [11] Compute Image Size & Clean Up ----------------------------------
 
   const [imageSize] = await Promise.all([
     getImageSize(tag),
@@ -228,7 +256,7 @@ export default async function dockerize(options: DockerizeArguments) {
   endBuildInteractive(() => log.info(`${emoji.get('checkered_flag')}  Built image ${log.chalk.cyan.bold(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`));
 
 
-  // ----- [11] (Optional) Push Image ------------------------------------------
+  // ----- [12] (Optional) Push Image ------------------------------------------
 
   if (!options.push) {
     return;
