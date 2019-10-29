@@ -102,7 +102,7 @@ export async function pkgInfo(opts?: Options): Promise<PkgInfoResult> {
   const root = path.dirname(pkg.path);
 
   return {
-    package: pkg.package,
+    package: pkg.packageJson,
     root
   };
 }
