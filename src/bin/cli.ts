@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
 import os from 'os';
-
-import yargs from 'yargs';
-
-import {DockerizeArguments} from 'etc/types';
+import cli from '@darkobits/saffron';
+import {DockerizeOptions} from 'etc/types';
 import dockerize from 'lib/dockerize';
 import log from 'lib/log';
 
 
-yargs.command({
-  command: '* [cwd]',
-  describe: '',
-  builder: command => {
-    command.usage('Easily Dockerize a NodeJS project.');
+interface DockerizeArguments extends Omit<DockerizeOptions, 'labels'> {
+  label: DockerizeOptions['labels'];
+}
 
+
+cli.command<DockerizeArguments>({
+  command: '* [cwd]',
+  builder: ({command}) => {
     command.positional('cwd', {
       description: 'Directory of the project to Dockerize.',
       type: 'string',
@@ -58,14 +58,6 @@ yargs.command({
       type: 'string'
     });
 
-    command.option('dockerfile', {
-      group: 'Optional Arguments:',
-      description: 'Path to a custom Dockerfile to use.',
-      required: false,
-      type: 'string',
-      conflicts: ['npmrc', 'nodeVersion']
-    });
-
     command.option('npmrc', {
       group: 'Optional Arguments:',
       description: 'Path to an .npmrc file to use when installing packages.\nOr set to true to use the closest .npmrc file.',
@@ -76,18 +68,24 @@ yargs.command({
 
     command.option('push', {
       group: 'Optional Arguments:',
-      description: 'Whether to push images to a registry.',
+      description: 'Whether to call `docker push` after building images.',
       required: false,
       type: 'boolean',
       default: false
     });
 
+    command.option('dockerfile', {
+      group: 'Advanced:',
+      description: 'Path to a custom Dockerfile to use.\n--node-version and --npmrc are moot when using this option.',
+      required: false,
+      type: 'string',
+      conflicts: ['npmrc', 'nodeVersion']
+    });
+
     command.example('$0', 'Dockerize the NodeJS project in the current directory using default options.');
     command.example('$0 --label="foo=bar" --label="baz=qux" --extra-args="--squash"', 'Dockerize the NodeJS project in the current directory, apply two labels, and pass the --squash argument to Docker.');
-
-    return command;
   },
-  handler: async (args: DockerizeArguments) => {
+  handler: async ({argv}) => {
     try {
       // Log level is 'silent' by default for Node API use cases; set it to
       // LOG_LEVEL or 'info' by default for CLI use.
@@ -95,15 +93,17 @@ yargs.command({
         level: process.env.LOG_LEVEL || 'info'
       });
 
-      // Pluralize 'label' when passing options to dockerize.
-      // @ts-ignore
-      args.labels = args.label;
-      Reflect.deleteProperty(args, 'label');
-
-      // Set cwd to the current directory if it was not set by the user.
-      args.cwd = args.cwd || process.cwd();
-
-      await dockerize(args);
+      await dockerize({
+        cwd: argv.cwd || process.cwd(),
+        tag: argv.tag,
+        nodeVersion: argv.nodeVersion,
+        labels: argv.label,
+        env: argv.env,
+        extraArgs: argv.extraArgs,
+        dockerfile: argv.dockerfile,
+        npmrc: argv.npmrc,
+        push: argv.push
+      });
     } catch (err) {
       let message: string;
       let stackLines: Array<string>;
@@ -116,22 +116,13 @@ yargs.command({
         [message, ...stackLines] = err.stack.split(os.EOL);
       }
 
-      log.error('', message);
-      log.verbose('', stackLines.join(os.EOL));
-      process.exit(1);
+      log.error(message);
+      log.verbose(stackLines.join(os.EOL));
+
+      throw err;
     }
   }
 });
 
 
-yargs.showHelpOnFail(true, 'See --help for usage instructions.');
-yargs.wrap(yargs.terminalWidth());
-yargs.alias('v', 'version');
-yargs.alias('h', 'help');
-yargs.version();
-yargs.strict();
-yargs.help();
-
-
-// Parse command-line arguments, bail on --help, --version, etc.
-export default yargs.argv;
+cli.init();

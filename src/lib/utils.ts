@@ -1,36 +1,16 @@
 import path from 'path';
 
+import chex from '@darkobits/chex';
 import nodeVersons from '@darkobits/node-versions';
 import bytes from 'bytes';
 import ejs from 'ejs';
-import execa from 'execa';
 import findUp from 'find-up';
 import fs from 'fs-extra';
 import readPkgUp, {NormalizedPackageJson, Options} from 'read-pkg-up';
 import tar from 'tar';
 
 import {DOCKER_IMAGE_PATTERN} from 'etc/constants';
-
-
-/**
- * Ensures that Docker is installed on the system and that the Docker daemon is
- * running.
- */
-export async function ensureDocker() {
-  try {
-    await execa('docker', ['version']);
-  } catch (err) {
-    if (err.exitCode === 127 || (err.exitCode === 2 && err.exitCodeName === 'ENOENT')) {
-      throw new Error('The "docker" command could not be found. Ensure Docker is installed.');
-    }
-
-    if (err.stderr.toLowerCase().includes('cannot connect to the docker daemon')) {
-      throw new Error('Unable to connect to the Docker daemon. Ensure Docker is running.');
-    }
-
-    throw err;
-  }
-}
+import {ThenArg} from 'etc/types';
 
 
 /**
@@ -177,10 +157,10 @@ export async function renderTemplate({template, dest, data}: RenderTemplateOptio
  * using `npm pack`, thereby collecting all relevant files needed for
  * production, then extracts the resulting tarball to the target directory.
  */
-export async function packAndExtractPackage(pkgRoot: string, destDir: string) {
+export async function packAndExtractPackage(npm: ThenArg<ReturnType<typeof chex>>, pkgRoot: string, destDir: string) {
   // Use `npm pack` to create a tarball of all files that would normally be
   // included when publishing the package.
-  const tarballName = (await execa('npm', ['pack', '--ignore-scripts'], {cwd: pkgRoot})).stdout;
+  const tarballName = (await npm(['pack', '--ignore-scripts'], {cwd: pkgRoot})).stdout;
 
   const tarballPath = path.resolve(pkgRoot, tarballName);
 
@@ -231,8 +211,8 @@ export async function copyNpmrc(npmrcOption: string | undefined, destDir: string
 /**
  * Provided a Docker image name, returns its size.
  */
-export async function getImageSize(imageName: string) {
-  const results = await execa('docker', ['inspect', imageName]);
+export async function getImageSize(docker: ThenArg<ReturnType<typeof chex>>, imageName: string) {
+  const results = await docker(['inspect', imageName]);
   return bytes(JSON.parse(results.stdout)[0].Size);
 }
 

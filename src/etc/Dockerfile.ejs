@@ -1,24 +1,25 @@
-
+# Stage 1
 FROM ubuntu:19.04 as base
 
-RUN apt-get update && apt-get install --yes curl
+ENV PATH=/tmp/node/bin:$PATH
 
-# Download Tini.
-RUN curl --silent --fail --location --output /usr/bin/tini https://github.com/krallin/tini/releases/download/v<%= tiniVersion %>/tini && chmod +x /usr/bin/tini
+RUN \
+  apt-get update && apt-get install --yes curl && \
+  # Download Tini.
+  curl --silent --fail --location --output /tmp/tini https://github.com/krallin/tini/releases/download/v<%= tiniVersion %>/tini && \
+  chmod +x /tmp/tini && \
+  # Download Node.
+  mkdir /tmp/node && \
+  curl --silent --fail https://nodejs.org/dist/v<%= nodeVersion %>/node-v<%= nodeVersion %>-linux-x64.tar.gz \
+  | tar --gunzip --extract --strip-components=1 --directory=/tmp/node
 
-# Download and install Node.
-RUN curl --silent --fail https://nodejs.org/dist/v<%= nodeVersion %>/node-v<%= nodeVersion %>-linux-x64.tar.gz | tar --gunzip --extract --strip-components=1 --directory=/usr/local
+# Create and move to project directory.
+WORKDIR /home/app
 
-# Uninstall curl & clean up.
-RUN apt-get remove --yes curl && apt-get autoremove --yes && apt-get autoclean
+# Copy manifests and build artifacts.
+COPY package /home/app
 
-# Create/move to the temporary project path.
-WORKDIR /home/node
-
-# Copy manifests and build artifacts into image.
-COPY package /home/node
-
-# Conditionally copy .npmrc, if specified.
+# Conditionally copy .npmrc.
 <% if (hasNpmrc) { %>
 COPY .npmrc .npmrc
 <% } %>
@@ -26,15 +27,19 @@ COPY .npmrc .npmrc
 # Install production dependencies.
 RUN npm <%= hasLockfile ? 'ci' : 'install' %> --production --skip-optional --ignore-scripts
 
-# Conditionally remove .npmrc if it was added earlier.
-<% if (hasNpmrc) { %>
-RUN rm .npmrc
-<% } %>
+# Stage 2
+FROM gcr.io/distroless/cc
 
 # Set environment variables.
 <% envVars.forEach(envExpression => { %>
   ENV <%= envExpression %>
 <% }); %>
+
+WORKDIR /home/app
+
+COPY --from=base /tmp/tini /bin/tini
+COPY --from=base /tmp/node /usr/local
+COPY --from=base /home/app /home/app
 
 # Set entrypoint.
 ENTRYPOINT ["tini", "--", "node", "<%= entry %>"]

@@ -1,13 +1,13 @@
 import path from 'path';
 
-import execa from 'execa';
+import chex from '@darkobits/chex';
 import fs from 'fs-extra';
 import emoji from 'node-emoji';
 import ow from 'ow';
 import tempy from 'tempy';
 
 import {DEFAULT_TINI_VERSION} from 'etc/constants';
-import {DockerizeArguments} from 'etc/types';
+import {DockerizeOptions} from 'etc/types';
 import log from 'lib/log';
 
 import {
@@ -16,7 +16,6 @@ import {
   copyPackageLockfile,
   copyNpmrc,
   ensureArray,
-  ensureDocker,
   getImageSize,
   getNodeLtsVersion,
   packAndExtractPackage,
@@ -26,9 +25,11 @@ import {
 } from 'lib/utils';
 
 
-export default async function dockerize(options: DockerizeArguments) {
+export default async function dockerize(options: DockerizeOptions) {
   const buildTime = log.createTimer();
-  await ensureDocker();
+
+  // Ensure Docker and NPM are installed.
+  const [docker, npm] = await Promise.all([chex('docker'), chex('npm')]);
 
 
   // ----- [1] Validate Options ------------------------------------------------
@@ -113,6 +114,7 @@ export default async function dockerize(options: DockerizeArguments) {
     copyNpmrc(options.npmrc, stagingDir),
     copyPackageLockfile(pkg.root, path.join(stagingDir, 'package'))
   ]);
+
 
   // ----- [6] Determine Dockerfile Strategy -----------------------------------
 
@@ -201,7 +203,7 @@ export default async function dockerize(options: DockerizeArguments) {
   log.info(`- Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'](String(hasLockfile))}`);
 
   if (envVars.length) {
-    log.info('⁃ Environment Variables:');
+    log.info('- Environment Variables:');
 
     envVars.forEach(varExpression => {
       const [key, value] = varExpression.split('=');
@@ -214,7 +216,7 @@ export default async function dockerize(options: DockerizeArguments) {
 
     ensureArray<string>(options.labels).forEach(labelExpression => {
       const [key, value] = labelExpression.split('=');
-      log.info(`  ⁃ ${key}: ${value}`);
+      log.info(`  - ${key}: ${value}`);
     });
   }
 
@@ -222,15 +224,24 @@ export default async function dockerize(options: DockerizeArguments) {
   // ----- [9] Pack Package ----------------------------------------------------
 
   const spinner = log.createSpinner();
-  const endBuildInteractive = log.beginInteractive(() => log.info(`${spinner} Building image ${log.chalk.cyan(tag)}...`));
+
+  let endBuildInteractive;
+
+  const buildMessage = `Building image ${log.chalk.cyan(tag)}...`;
+
+  if (log.isLevelAtLeast('silly')) {
+    log.info(buildMessage);
+  } else {
+    endBuildInteractive = log.beginInteractive(() => log.info(`${spinner} ${buildMessage}`));
+  }
 
   // Copy production-relevant package files to the staging directory.
-  await packAndExtractPackage(pkg.root, stagingDir);
+  await packAndExtractPackage(npm, pkg.root, stagingDir);
 
 
   // ----- [10] Build Image -----------------------------------------------------
 
-  const buildProcess = execa.command(`docker build . ${dockerBuildArgs}`, {
+  const buildProcess = docker(`build . ${dockerBuildArgs}`, {
     cwd: stagingDir,
     stdin: 'ignore',
     stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
@@ -252,17 +263,16 @@ export default async function dockerize(options: DockerizeArguments) {
   // ----- [11] Compute Image Size & Clean Up ----------------------------------
 
   const [imageSize] = await Promise.all([
-    getImageSize(tag),
+    getImageSize(docker, tag),
     fs.remove(stagingDir)
   ]);
 
-  const doneMessage = `${emoji.get('checkered_flag')}  Built image ${log.chalk.cyan(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`;
+  const endBuildMessage = `${emoji.get('checkered_flag')}  Built image ${log.chalk.cyan(tag)} ${log.chalk.dim(`(${imageSize})`)} in ${buildTime}.`;
 
-  if (log.isLevelAtLeast('silly')) {
-    endBuildInteractive(() => log.info(''));
-    log.info(doneMessage);
+  if (endBuildInteractive) {
+    endBuildInteractive(() => log.info(endBuildMessage));
   } else {
-    endBuildInteractive(() => log.info(doneMessage));
+    log.info(endBuildMessage);
   }
 
 
@@ -273,9 +283,18 @@ export default async function dockerize(options: DockerizeArguments) {
   }
 
   const pushTime = log.createTimer();
-  const endPushInteractive = log.beginInteractive(() => log.info(`${spinner} Pushing image ${log.chalk.cyan(tag)}...`));
 
-  const pushProcess = execa('docker', ['push', tag], {
+  let endPushInteractive;
+
+  const pushMessage = `Pushing image ${log.chalk.cyan(tag)}...`;
+
+  if (log.isLevelAtLeast('silly')) {
+    log.info(pushMessage);
+  } else {
+    endPushInteractive = log.beginInteractive(() => log.info(`${spinner} ${pushMessage}`));
+  }
+
+  const pushProcess = docker(['push', tag], {
     stdin: 'ignore',
     stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
     stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
@@ -291,5 +310,11 @@ export default async function dockerize(options: DockerizeArguments) {
 
   await pushProcess;
 
-  endPushInteractive(() => log.info(`${emoji.get('rocket')}  Pushed image ${log.chalk.cyan(tag)} in ${pushTime}.`));
+  const endPushMessage = `${emoji.get('rocket')}  Pushed image ${log.chalk.cyan(tag)} in ${pushTime}.`;
+
+  if (endPushInteractive) {
+    endPushInteractive(() => log.info(endPushMessage));
+  } else {
+    log.info(endPushMessage);
+  }
 }

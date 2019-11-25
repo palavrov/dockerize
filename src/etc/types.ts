@@ -1,10 +1,13 @@
-import {Arguments} from 'yargs';
+/**
+ * Gets the inner type from a type wrapped in Promise.
+ */
+export type ThenArg<T> = T extends Promise<infer U> ? U : T;
 
 
 /**
  * Options object accepted by Dockerize.
  */
-export interface DockerizeArguments extends Arguments {
+export interface DockerizeOptions {
   /**
    * Root directory of the project to Dockerize.
    *
