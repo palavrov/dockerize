@@ -107,8 +107,8 @@ export default async function dockerize(options: DockerizeOptions) {
      * Resolves with `true` if the project has a lockfile.
      */
     hasLockfile
-   ] = await Promise.all([
-    options.nodeVersion || getNodeLtsVersion(),
+  ] = await Promise.all([
+    options.nodeVersion ?? getNodeLtsVersion(),
     // N.B. These two files are not included in `npm pack`, so we have to copy
     // them explicitly.
     copyNpmrc(options.npmrc, stagingDir),
@@ -144,8 +144,8 @@ export default async function dockerize(options: DockerizeOptions) {
       const contextDockerfilePath = path.resolve(options.cwd, 'Dockerfile');
       await fs.access(contextDockerfilePath);
       finalDockerfileSourcePath = contextDockerfilePath;
-      return fs.copy(contextDockerfilePath, targetDockerfilePath);
-    } catch (err) {
+      return await fs.copy(contextDockerfilePath, targetDockerfilePath);
+    } catch  {
       // Context does not have a Dockerfile, we can safely recover from this and
       // move on to generating our own.
     }
@@ -202,7 +202,7 @@ export default async function dockerize(options: DockerizeOptions) {
   log.info(`- Node Version: ${log.chalk.green(nodeVersion)}`);
   log.info(`- Lockfile: ${log.chalk[hasLockfile ? 'green' : 'yellow'](String(hasLockfile))}`);
 
-  if (envVars.length) {
+  if (envVars.length > 0) {
     log.info('- Environment Variables:');
 
     envVars.forEach(varExpression => {
@@ -239,14 +239,14 @@ export default async function dockerize(options: DockerizeOptions) {
   await packAndExtractPackage(npm, pkg.root, stagingDir);
 
 
-  // ----- [10] Build Image -----------------------------------------------------
+  // ----- [10] Build Image ----------------------------------------------------
 
   const buildProcess = docker(`build . ${dockerBuildArgs}`, {
     cwd: stagingDir,
     stdin: 'ignore',
     stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
     stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
-    buffer: log.isLevelAtLeast('silly') ? false : true,
+    buffer: log.isLevelAtLeast('silly') ? false : true
   });
 
   if (buildProcess.stdout) {
@@ -297,7 +297,7 @@ export default async function dockerize(options: DockerizeOptions) {
   const pushProcess = docker(['push', tag], {
     stdin: 'ignore',
     stdout: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
-    stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore',
+    stderr: log.isLevelAtLeast('silly') ? 'pipe' : 'ignore'
   });
 
   if (pushProcess.stdout) {

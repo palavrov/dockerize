@@ -2,7 +2,7 @@
 
 import os from 'os';
 import cli from '@darkobits/saffron';
-import {DockerizeOptions} from 'etc/types';
+import { DockerizeOptions } from 'etc/types';
 import dockerize from 'lib/dockerize';
 import log from 'lib/log';
 
@@ -85,12 +85,12 @@ cli.command<DockerizeArguments>({
     command.example('$0', 'Dockerize the NodeJS project in the current directory using default options.');
     command.example('$0 --label="foo=bar" --label="baz=qux" --extra-args="--squash"', 'Dockerize the NodeJS project in the current directory, apply two labels, and pass the --squash argument to Docker.');
   },
-  handler: async ({argv}) => {
+  handler: async ({ argv }) => {
     try {
       // Log level is 'silent' by default for Node API use cases; set it to
       // LOG_LEVEL or 'info' by default for CLI use.
       log.configure({
-        level: process.env.LOG_LEVEL || 'info'
+        level: process.env.LOG_LEVEL ?? 'info'
       });
 
       await dockerize({

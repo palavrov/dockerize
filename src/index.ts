@@ -1,1 +1,1 @@
-export {default as default} from 'lib/dockerize';
+export {default} from 'lib/dockerize';

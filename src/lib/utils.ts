@@ -74,7 +74,7 @@ export async function pkgInfo(opts?: Options): Promise<PkgInfoResult> {
   });
 
   if (!pkg) {
-    if (opts && opts.cwd) {
+    if (opts?.cwd) {
       throw new Error(`Unable to find a "package.json" for the package at ${opts.cwd}.`);
     }
 
@@ -186,7 +186,7 @@ export async function copyPackageLockfile(pkgRoot: string, destDir: string) {
     await fs.access(path.join(pkgRoot, 'package-lock.json'));
     await fs.copy(path.join(pkgRoot, 'package-lock.json'), path.join(destDir, 'package-lock.json'));
     return true;
-  } catch (err) {
+  } catch  {
     return false;
   }
 }
