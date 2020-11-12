@@ -1,11 +1,11 @@
 <a href="#top" id="top">
-  <img src="https://user-images.githubusercontent.com/441546/57589163-d5c72e00-74d4-11e9-9007-5fece7c67509.png" style="max-width: 100%;">
+  <img src="https://user-images.githubusercontent.com/441546/98974026-49326d00-24c9-11eb-84c3-9e9ec3eb44cb.png" style="max-width: 100%;">
 </a>
 <p align="center">
-  <a href="https://www.npmjs.com/package/@darkobits/dockerize"><img src="https://img.shields.io/npm/v/@darkobits/dockerize.svg?style=flat-square"></a>
-  <a href="https://github.com/darkobits/log/actions"><img src="https://img.shields.io/endpoint?url=https://aws.frontlawn.net/ga-shields/darkobits/log&style=flat-square"></a>
-  <a href="https://david-dm.org/darkobits/dockerize"><img src="https://img.shields.io/david/darkobits/dockerize.svg?style=flat-square"></a>
-  <a href="https://conventionalcommits.org"><img src="https://img.shields.io/badge/conventional%20commits-1.0.0-FB5E85.svg?style=flat-square"></a>
+  <a href="https://www.npmjs.com/package/@darkobits/dockerize"><img src="https://img.shields.io/npm/v/@darkobits/dockerize.svg?style=for-the-badge"></a>
+  <a href="https://travis-ci.com/github/darkobits/dockerize"><img src="https://img.shields.io/travis/com/darkobits/dockerize?style=for-the-badge"></a>
+  <a href="https://david-dm.org/darkobits/dockerize"><img src="https://img.shields.io/david/darkobits/dockerize.svg?style=for-the-badge"></a>
+  <a href="https://conventionalcommits.org"><img src="https://img.shields.io/badge/conventional%20commits-1.0.0-FB5E85.svg?style=for-the-badge"></a>
 </p>
 
 This package aims to make containerizing a Node project as straightforward as using `npm publish`. It leverages `npm pack` (used internally by `npm publish`) to determine which files are production-relevant and existing standards for determining a project's entrypoint, namely the `"main"` and `"bin"` `package.json` fields.
@@ -47,7 +47,7 @@ To containerize this project, we can run `npm run dockerize`, which will invoke 
 This will produce a Docker image with the tag `web-server-demo:0.1.0` using the [current LTS version of Node](https://nodejs.org). To start our containerized web server, we can run:
 
 ```
-docker run -interactive --tty web-server-demo:0.1.0
+docker run --interactive --tty web-server-demo:0.1.0
 ```
 
 ## Options
@@ -150,7 +150,7 @@ If your project has production dependencies that are installed from private regi
 **Example:**
 
 ```
-dockerize --node-version="12.13.4"
+dockerize --npmrc="~/.npmrc"
 ```
 
 **Note:** If an `.npmrc` file is used, it will be deleted from the image once dependencies are installed.
@@ -223,7 +223,7 @@ await Dockerize({
   nodeVersion: '10.14.2',
   // These options should use the singular form for their key, but their values may be strings
   // or arrays of strings.
-  label: ['foo=bar', 'baz=qux],
+  label: ['foo=bar', 'baz=qux'],
   env: ['EDITOR=vim']
 });
 ```
@@ -232,6 +232,8 @@ await Dockerize({
 
 This tool respects the `LOG_LEVEL` environment variable. It may be set to `verbose` or `silly` to enable additional logging.
 
-<a href="#top">
-  <img src="https://user-images.githubusercontent.com/441546/69777002-41ac7380-1153-11ea-85a4-88184f8c9975.png" style="max-width: 100%;">
-</a>
+## &nbsp;
+<p align="center">
+  <br>
+  <img width="22" height="22" src="https://cloud.githubusercontent.com/assets/441546/25318539/db2f4cf2-2845-11e7-8e10-ef97d91cd538.png">
+</p>
