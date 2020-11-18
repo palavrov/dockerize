@@ -160,9 +160,9 @@ export async function renderTemplate({template, dest, data}: RenderTemplateOptio
 export async function packAndExtractPackage(npm: ThenArg<ReturnType<typeof chex>>, pkgRoot: string, destDir: string) {
   // Use `npm pack` to create a tarball of all files that would normally be
   // included when publishing the package.
-  const tarballName = (await npm(['pack', '--ignore-scripts'], {cwd: pkgRoot})).stdout;
+  const tarballName = (await npm(['pack'], {cwd: pkgRoot})).stdout.split(/\r\n|\r|\n/).pop();
 
-  const tarballPath = path.resolve(pkgRoot, tarballName);
+  const tarballPath = path.resolve(pkgRoot, tarballName ?? '');
 
   // Extract the NPM tarball to the staging area. By default, this will create a
   // subdirectory there named 'package' containing the tarball contents.
