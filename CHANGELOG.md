@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.6](https://github.com/darkobits/dockerize/compare/v0.2.5...v0.2.6) (2020-11-20)
+
+
+### Features
+
+* Add ubuntuVersion option / CLI flag, default to 20.10. ([e1a6f99](https://github.com/darkobits/dockerize/commit/e1a6f99ec5042b8138c561748ad9e273452749be))
+
 ### [0.2.5](https://github.com/darkobits/dockerize/compare/v0.2.4...v0.2.5) (2020-11-12)
 
 ### [0.2.4](https://github.com/darkobits/dockerize/compare/v0.2.3...v0.2.4) (2019-11-25)
