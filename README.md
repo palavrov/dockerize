@@ -142,6 +142,23 @@ dockerize --node-version="12.13.4"
 
 <table>
   <tr><th align="left">Name</th><th align="left">Required</th><th align="left">Default</th></tr>
+  <tr><td><code>--ubuntu-version</code></td><td><code>false</code></td><td><code>20.10</code></td></tr>
+</table>
+
+Ubuntu version to use as a base image. This option supports any valid tag for the [public `ubuntu` image](https://hub.docker.com/_/ubuntu/).
+
+**Example:**
+
+```
+dockerize --ubuntu-version="latest"
+```
+
+**Note:** This argument is moot when the `--dockerfile` flag is used.
+
+<a href="#top" title="Back to top"><img src="https://user-images.githubusercontent.com/441546/67830932-d6ab4680-fa99-11e9-9870-bc6d31db5a1b.png"></a>
+
+<table>
+  <tr><th align="left">Name</th><th align="left">Required</th><th align="left">Default</th></tr>
   <tr><td><code>--npmrc</code></td><td><code>false</code></td><td>N/A</td></tr>
 </table>
 
@@ -154,6 +171,7 @@ dockerize --npmrc="~/.npmrc"
 ```
 
 **Note:** If an `.npmrc` file is used, it will be deleted from the image once dependencies are installed.
+
 **Note:** This argument is moot when the `--dockerfile` flag is used.
 
 <a href="#top" title="Back to top"><img src="https://user-images.githubusercontent.com/441546/67830932-d6ab4680-fa99-11e9-9870-bc6d31db5a1b.png"></a>

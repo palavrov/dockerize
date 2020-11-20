@@ -37,6 +37,7 @@ export default async function dockerize(options: DockerizeOptions) {
   ow(options.cwd, 'cwd', ow.string);
   ow(options.tag, 'tag', ow.any(ow.undefined, ow.string));
   ow(options.nodeVersion, 'Node version', ow.any(ow.undefined, ow.string));
+  ow(options.ubuntuVersion, 'Ubuntu version', ow.any(ow.undefined, ow.string));
   ow(options.labels, 'labels', ow.any(ow.undefined, ow.string, ow.array.ofType(ow.string)));
   ow(options.env, 'environment variables', ow.any(ow.undefined, ow.string, ow.array.ofType(ow.string)));
   ow(options.extraArgs, 'extra Docker arguments', ow.any(ow.undefined, ow.string));
@@ -56,6 +57,11 @@ export default async function dockerize(options: DockerizeOptions) {
 
 
   // ----- [3] Parse Options ---------------------------------------------------
+
+  /**
+   * Ubuntu version to use as a base image.
+   */
+  const ubuntuVersion = options.ubuntuVersion ?? '20.10';
 
   /**
    * Tag that will be applied to the image.
@@ -162,6 +168,7 @@ export default async function dockerize(options: DockerizeOptions) {
         envVars,
         hasLockfile,
         nodeVersion,
+        ubuntuVersion,
         tiniVersion: DEFAULT_TINI_VERSION,
         hasNpmrc
       }

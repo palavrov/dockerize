@@ -30,6 +30,13 @@ export interface DockerizeOptions {
   nodeVersion?: string;
 
   /**
+   * Ubuntu version to use as a base image.
+   *
+   * Default: 20.10
+   */
+  ubuntuVersion?: string;
+
+  /**
    * Additional labels to apply to the image.
    *
    * See: https://docs.docker.com/engine/reference/commandline/build/

@@ -36,6 +36,14 @@ cli.command<DockerizeArguments>({
       conflicts: ['dockerfile']
     });
 
+    command.option('ubuntu-version', {
+      group: 'Optional Arguments:',
+      description: 'Ubuntu version to use as a base image. [Default: 20.10]',
+      required: false,
+      type: 'string',
+      conflicts: ['dockerfile']
+    });
+
     command.option('label', {
       group: 'Optional Arguments:',
       description: 'Labels to apply to the image. May be used multiple times.',
@@ -97,6 +105,7 @@ cli.command<DockerizeArguments>({
         cwd: argv.cwd || process.cwd(),
         tag: argv.tag,
         nodeVersion: argv.nodeVersion,
+        ubuntuVersion: argv.ubuntuVersion,
         labels: argv.label,
         env: argv.env,
         extraArgs: argv.extraArgs,
